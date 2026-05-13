@@ -41,8 +41,6 @@ data/
 template.zip
 
 # Scratch / research notes
-.rough/
-
 # Environment secrets
 .env
 .env.local
@@ -54,7 +52,7 @@ Thumbs.db
 
 # Logs
 *.log
-logs/
+.logs/
 
 # MCP server runtime
 .mcp/
