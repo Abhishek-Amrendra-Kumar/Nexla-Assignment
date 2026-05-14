@@ -41,8 +41,8 @@ build/
 # Template archives
 template.zip
 
-# Data (mount at runtime)
-data/
+# Data (needed for list_documents)
+# data/
 
 # Development
 .rough/

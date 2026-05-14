@@ -59,6 +59,9 @@ COPY --from=builder /app/pyproject.toml .
 # This avoids re-indexing ~231 documents at runtime (~30min+ process).
 COPY chroma_db/ /app/chroma_db/
 
+# Copied data for list_documents  
+COPY data/ /app/data/
+
 # Create non-root user for safety
 RUN useradd --create-home --shell /bin/bash appuser && \
     chown -R appuser:appuser /app
