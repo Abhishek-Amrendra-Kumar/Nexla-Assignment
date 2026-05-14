@@ -145,7 +145,7 @@ Dev dependencies:
 
 **Goal:** Expose tools via the MCP protocol.
 
-- [ ] Write `src/nexla_mcp/server.py`
+- [ ] Write `src/nexla_mcp.mcp.py`
   - Initialize FastMCP server
   - Register `query_documents` tool:
     - Input: `question: str`, `top_k: int = 5`
@@ -157,7 +157,7 @@ Dev dependencies:
 - [ ] On startup: auto-index all documents if index is empty
 - [ ] Server runs via `mcp.run()` (stdio transport for local MCP clients)
 
-**Exit criterion:** `uv run python -m nexla_mcp.server` starts without errors. MCP client can call `query_documents`.
+**Exit criterion:** `uv run python -m nexla_mcp.mcp` starts without errors. MCP client can call `query_documents`.
 
 ---
 
@@ -187,7 +187,7 @@ Dev dependencies:
 - [ ] **Setup Instructions** — step-by-step install from scratch
   ```
   uv sync
-  uv run python -m nexla_mcp.server
+  uv run python -m nexla_mcp.mcp
   ```
 - [ ] **Architecture Overview** — system diagram + component description
   - Document ingestion → chunking → embedding → vector store → retrieval → LLM → MCP tool
@@ -231,7 +231,7 @@ Dev dependencies:
 
 **Goal:** Ensure everything works and submit.
 
-- [ ] Clone fresh to a temp directory — verify `uv sync && uv run python -m nexla_mcp.server` works from scratch
+- [ ] Clone fresh to a temp directory — verify `uv sync && uv run python -m nexla_mcp.mcp` works from scratch
 - [ ] Test with MCP client (e.g., Claude Desktop or any MCP-compatible client)
 - [ ] Verify `query_documents` returns answers with source attribution
 - [ ] Verify 3+ example Q&As are documented in README

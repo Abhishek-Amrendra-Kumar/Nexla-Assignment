@@ -1,4 +1,4 @@
-from nexla_mcp.server import mcp
+from nexla_mcp.mcp import mcp
 
 
 def main() -> None:

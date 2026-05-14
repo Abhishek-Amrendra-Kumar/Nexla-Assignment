@@ -30,7 +30,8 @@ uv sync                                    # sync lock file with environment (af
 
 # Dependency management
 uv add <pkg>                              # install + update pyproject.toml + lock
-uv add -e .                               # editable install (project itself)
+uv add -e .                               # editable install (runtime deps only)
+uv add -e ".[indexing]"                   # editable install with torch + sentence-transformers
 uv add -r requirements.txt                 # bulk add from requirements file
 uv remove <pkg>                           # uninstall + update lock
 
@@ -68,6 +69,7 @@ uvx <cli-tool>                            # one-shot equivalent of above
 ```
 nexla-mcp/                    # project root
 ├── .rough/                   # temporary research & scratch notes
+├── chroma_db/                # pre-built ChromaDB index (commit to repo)
 ├── data/                     # PDF documents + Q&A pairs
 │   └── <id>/
 │       ├── <id>_qa.jsonl    # Q&A pairs (question, answer, type, evidence)
@@ -75,14 +77,21 @@ nexla-mcp/                    # project root
 ├── src/
 │   └── nexla_mcp/
 │       ├── __init__.py
-│       ├── server.py         # FastMCP server entry point
-│       ├── pdf_processor.py # PDF ingestion + text extraction
-│       ├── indexer.py       # Chunking + embedding + vector store
-│       ├── retriever.py     # Similarity search + context assembly
-│       ├── llm.py           # LLM call for answer generation
-│       └── models.py        # Pydantic request/response models
+│       ├── __main__.py       # entry point: python -m nexla_mcp
+│       ├── mcp.py            # FastMCP server + tools
+│       ├── pdf_processor.py  # PDF ingestion + text extraction
+│       ├── indexer/          # Chunking + embedding + vector store (package)
+│       │   ├── hf.py         # HuggingFace embedding
+│       │   ├── manifest.py   # ChromaDB client + manifest
+│       │   └── process.py   # Incremental indexing
+│       ├── retriever.py      # Similarity search + context assembly
+│       ├── llm/              # LLM inference (package)
+│       │   └── inference.py  # OpenAI-compatible LLM calls
+│       └── models.py         # Pydantic request/response models
 ├── tests/
 │   └── ...
+├── Dockerfile
+├── .dockerignore
 ├── pyproject.toml
 ├── uv.lock
 └── README.md
@@ -158,11 +167,17 @@ uv sync                        # sync environment to lock file
 # Add a dependency
 uv add <pkg>
 
-# Run the server
-uv run python -m nexla_mcp.server
+# Run the server (local)
+uv run python -m nexla_mcp
 
 # Run tests
 uv run python tests/test_indexer.py
+
+# Build Docker image (lean — HF Inference API for embeddings)
+docker build -t nexla-mcp .
+
+# Build Docker image with indexing support (local torch embeddings)
+docker build --build-arg INSTALL_INDEXING=true -t nexla-mcp:indexer .
 ```
 
 ### File Edit Guidelines

@@ -1,0 +1,54 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*.egg-info
+.eggs
+*.egg
+
+# Virtual environments
+.venv
+venv/
+
+# Caches
+.ruff_cache
+.pytest_cache
+.mypy_cache
+
+# Environment files (must be passed at runtime, never baked in)
+.env
+.env.*
+!.env.example
+
+# Logs
+.logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Build artifacts
+dist/
+build/
+*.whl
+
+# NOTE: chroma_db/ IS included in the image — do NOT ignore it
+
+# Template archives
+template.zip
+
+# Data (mount at runtime)
+data/
+
+# Development
+.rough/
+problem-statement/
+
+# These are needed for the build
+!README.md
+!pyproject.toml
+!uv.lock

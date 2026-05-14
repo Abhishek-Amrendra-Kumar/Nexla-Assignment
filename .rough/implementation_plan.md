@@ -557,7 +557,7 @@ uv run python -c "from nexla_mcp.llm import generate_answer_with_sources; a, s =
 
 ## Step 7: MCP Server (FastMCP)
 
-File: `src/nexla_mcp/server.py`
+File: `src/nexla_mcp.mcp.py`
 
 ### 7.1 Imports and startup indexing
 ```python
@@ -632,7 +632,7 @@ def get_document_summary(doc_id: str) -> dict:
 ### 7.4 Main entry point
 File: `src/nexla_mcp/__main__.py`
 ```python
-from nexla_mcp.server import mcp
+from nexla_mcp.mcp import mcp
 
 if __name__ == "__main__":
     mcp.run()  # stdio transport by default
@@ -642,7 +642,7 @@ if __name__ == "__main__":
 ```bash
 # Start Ollama first (required for LLM)
 ollama serve &
-uv run python -m nexla_mcp.server
+uv run python -m nexla_mcp.mcp
 ```
 **Exit:** Server starts, responds to `query_documents` calls via MCP client.
 
@@ -912,7 +912,7 @@ git clone <repo-url>
 cd nexla-mcp
 uv sync
 # Requires Ollama running: ollama serve
-uv run python -m nexla_mcp.server
+uv run python -m nexla_mcp.mcp
 ```
 ```
 
@@ -969,7 +969,7 @@ cd /tmp && rm -rf nexla-mcp-test && \
 
 Checklist:
 - [ ] `uv sync` succeeds
-- [ ] `uv run python -m nexla_mcp.server` starts without errors
+- [ ] `uv run python -m nexla_mcp.mcp` starts without errors
 - [ ] `query_documents` returns answers with sources
 - [ ] README complete with 3+ Q&A examples
 - [ ] `.rough/` excluded from repo (in .gitignore)
@@ -998,7 +998,7 @@ Step 0 → Step 1 → Step 2 → Step 3 → Step 4 ─┐
 | Step 6.3 `llm.py` | Returns dicts; server.py called `.model_dump()` on dicts | Returns `list[dict]` explicitly; server.py uses directly |
 | Step 7.2 `server.py` | `"sources": [s.model_dump() for s in sources]` — fails (s is dict) | `"sources": sources` — use dicts directly |
 | Step 8.3 `test_indexer.py` | `chromadb.Client(Settings(persist_directory=...))` | `chromadb.PersistentClient(path=...)` |
-| Step 8.7 `random_qa_sample.py` | `Client("src/nexla_mcp/server.py")` — wrong FastMCP API | Direct import of `retrieve()` + `build_context()` functions |
+| Step 8.7 `random_qa_sample.py` | `Client("src/nexla_mcp.mcp.py")` — wrong FastMCP API | Direct import of `retrieve()` + `build_context()` functions |
 
 ---
 

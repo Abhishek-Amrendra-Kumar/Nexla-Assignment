@@ -16,6 +16,10 @@ dependencies = [
     "pydantic>=2.13.4",
     "pymupdf>=1.27.2.3",
     "python-dotenv>=1.2.2",
+]
+
+[project.optional-dependencies]
+indexing = [
     "sentence-transformers>=3.0.0",
     "torch>=2.0.0",
 ]

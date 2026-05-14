@@ -10,9 +10,30 @@ cp env.example .env        # configure API keys
 uv run nexla-mcp           # start the MCP server
 ```
 
+## Docker
+
+```bash
+# Lean runtime (default — no torch/sentence-transformers, uses HF Inference API for embeddings)
+docker build -t nexla-mcp .
+
+# Fat image (includes torch + sentence-transformers for local inference)
+docker build --build-arg INSTALL_INDEXING=true -t nexla-mcp:indexer .
+
+# Run (stdio transport — for MCP agent harnesses)
+docker run -i --rm \
+  -e HF_TOKEN=your_hf_token \
+  -e LITELLM_API_KEY=your_api_key \
+  -e LITELLM_BASE_URL=https://api.openai.com/v1 \
+  -e LITELLM_MODEL=gpt-4o-mini \
+  nexla-mcp
+```
+
+The pre-built `chroma_db/` index is copied into the image — no re-indexing needed at runtime.
+`USE_LOCAL_INFERENCE` is set automatically based on the image type (false for lean, true for fat).
+
 ## Prerequisites
 
-- Python ≥3.10
+- Python ≥3.11
 - [uv](https://docs.astral.sh/uv/) (package manager)
 
 ## Configuration
@@ -41,6 +62,7 @@ data/
 ```
 
 On first run, the server indexes all PDFs into ChromaDB (persisted to `chroma_db/`).
+For Docker, the pre-built index is included in the image — indexing is not needed at runtime.
 
 ## Tools
 

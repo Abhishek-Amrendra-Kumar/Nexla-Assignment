@@ -1,8 +1,9 @@
+import os
 from pathlib import Path
 
 # Embedding model
 MODEL_NAME = "lightonai/DenseOn"
-USE_LOCAL_INFERENCE = True
+USE_LOCAL_INFERENCE = os.environ.get("USE_LOCAL_INFERENCE", "true").lower() == "true"
 
 # Indexing limits
 DOC_LIMIT = 10000000000
