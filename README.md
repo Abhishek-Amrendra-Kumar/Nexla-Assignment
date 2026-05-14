@@ -31,6 +31,79 @@ docker run -i --rm \
 The pre-built `chroma_db/` index is copied into the image — no re-indexing needed at runtime.
 `USE_LOCAL_INFERENCE` is set automatically based on the image type (false for lean, true for fat).
 
+## MCP Client Configuration
+
+### Claude Code / Claude Desktop
+
+Add to your Claude Desktop config (e.g. `claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "nexla-mcp": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--init",
+        "--pull=never",
+        "-e",
+        "HF_TOKEN",
+        "-e",
+        "LITELLM_API_KEY",
+        "-e",
+        "LITELLM_BASE_URL",
+        "-e",
+        "LITELLM_MODEL",
+        "nexla-mcp"
+      ],
+      "env": {
+        "HF_TOKEN": "hf_***",
+        "LITELLM_API_KEY": "sk_***",
+        "LITELLM_BASE_URL": "https://api.minimax.io/v1",
+        "LITELLM_MODEL": "MiniMax-M2.7-highspeed"
+      }
+    }
+  }
+}
+```
+
+### OpenCode
+
+Add to your OpenCode MCP client config:
+
+```json
+"nexla-mcp": {
+  "type": "local",
+  "command": [
+    "docker",
+    "run",
+    "-i",
+    "--rm",
+    "--init",
+    "--pull=never",
+    "-e",
+    "HF_TOKEN",
+    "-e",
+    "LITELLM_API_KEY",
+    "-e",
+    "LITELLM_BASE_URL",
+    "-e",
+    "LITELLM_MODEL",
+    "nexla-mcp"
+  ],
+  "environment": {
+    "HF_TOKEN": "hf_***",
+    "LITELLM_API_KEY": "sk_***",
+    "LITELLM_BASE_URL": "https://api.minimax.io/v1",
+    "LITELLM_MODEL": "MiniMax-M2.7-highspeed"
+  }
+}
+```
+
+> Replace `HF_TOKEN` and `LITELLM_API_KEY` with your actual keys.
+
 ## Prerequisites
 
 - Python ≥3.11
