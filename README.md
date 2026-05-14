@@ -10,6 +10,16 @@ cp env.example .env        # configure API keys
 uv run nexla-mcp           # start the MCP server
 ```
 
+## CLI Helper
+
+`CLI.sh` provides convenience commands for setup and deployment:
+
+```bash
+./CLI.sh setup <google-drive-link>  # Download data + chroma_db from Google Drive
+./CLI.sh now                        # Build Docker image
+./CLI.sh config                     # Show MCP client configuration
+```
+
 ## Docker
 
 ```bash
