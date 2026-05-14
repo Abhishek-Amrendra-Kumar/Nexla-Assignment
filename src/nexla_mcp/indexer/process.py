@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from pathlib import Path
 
+from nexla_mcp.config import DOC_LIMIT
 from nexla_mcp.indexer.hf import encode_texts
 from nexla_mcp.indexer.manifest import (
     _compute_file_hash,
@@ -16,7 +17,7 @@ def index_documents(chunks: list, collection_name: str = "nexla_docs"):
     collection = client.get_or_create_collection(name=collection_name)
 
     texts = [c.text for c in chunks]
-    embeddings = encode_texts(texts)
+    embeddings = encode_texts(texts, prompt_name="document")
 
     # Prepare metadata
     metadatas = [
@@ -52,7 +53,7 @@ def get_or_create_index(data_dir: Path = Path("data")):
     collection = get_chroma_client().get_or_create_collection(name="nexla_docs")
 
     # Scan filesystem for all PDFs
-    pdf_paths = list(data_dir.glob("*/*.pdf"))[:2]
+    pdf_paths = list(data_dir.glob("*/*.pdf"))[:DOC_LIMIT]
     found_doc_ids = {p.parent.name for p in pdf_paths}
 
     # MIGRATION: if ChromaDB has data but no manifest, build manifest from

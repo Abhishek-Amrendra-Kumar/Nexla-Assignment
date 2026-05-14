@@ -16,7 +16,7 @@ def retrieve(question: str, top_k: int = 5) -> list[dict]:
     collection = get_or_create_index()
 
     # Embed question using fastembed via encode_texts
-    question_embedding = encode_texts([question])[0]
+    question_embedding = encode_texts([question], prompt_name="query")[0]
 
     # Query ChromaDB
     results = collection.query(

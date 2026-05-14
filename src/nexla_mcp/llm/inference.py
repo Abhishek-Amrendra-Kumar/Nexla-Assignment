@@ -1,6 +1,7 @@
 from openai import OpenAI
 import time
-from nexla_mcp.llm.prompts import SYSTEM_PROMPT
+
+from nexla_mcp.config import PROMPTS
 from nexla_mcp.env_secrets import Secrets
 
 
@@ -49,7 +50,7 @@ def generate_answer_with_sources(
 
     context = build_context(chunks)
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": PROMPTS["system"]},
         {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"},
     ]
 

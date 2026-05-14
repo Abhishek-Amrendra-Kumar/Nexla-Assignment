@@ -5,8 +5,7 @@ from pathlib import Path
 import chromadb
 from chromadb.config import Settings
 
-PERSIST_DIR = Path("chroma_db")
-MANIFEST_PATH = PERSIST_DIR / "index_manifest.json"
+from nexla_mcp.config import MANIFEST_PATH, PERSIST_DIR
 
 
 def get_chroma_client(persist_dir: Path = PERSIST_DIR):

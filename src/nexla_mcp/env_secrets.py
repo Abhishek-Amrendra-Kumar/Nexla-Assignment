@@ -1,6 +1,13 @@
 import os
 from dotenv import load_dotenv
 
+from nexla_mcp.config import (
+    ENV_HF_TOKEN,
+    ENV_LITELLM_API_KEY,
+    ENV_LITELLM_BASE_URL,
+    ENV_LITELLM_MODEL,
+)
+
 
 class Secrets:
     _instance = None
@@ -12,10 +19,10 @@ class Secrets:
             missing = [
                 v
                 for v in [
-                    "HF_TOKEN",
-                    "LITELLM_API_KEY",
-                    "LITELLM_BASE_URL",
-                    "LITELLM_MODEL",
+                    ENV_HF_TOKEN,
+                    ENV_LITELLM_API_KEY,
+                    ENV_LITELLM_BASE_URL,
+                    ENV_LITELLM_MODEL,
                 ]
                 if not os.environ.get(v) or not os.environ.get(v).strip()
             ]
@@ -24,13 +31,13 @@ class Secrets:
         return cls._instance
 
     def get_hf_token(self) -> str:
-        return os.environ["HF_TOKEN"]
+        return os.environ[ENV_HF_TOKEN]
 
     def get_api_key(self) -> str:
-        return os.environ["LITELLM_API_KEY"]
+        return os.environ[ENV_LITELLM_API_KEY]
 
     def get_base_url(self) -> str:
-        return os.environ["LITELLM_BASE_URL"]
+        return os.environ[ENV_LITELLM_BASE_URL]
 
     def get_model(self) -> str:
-        return os.environ["LITELLM_MODEL"]
+        return os.environ[ENV_LITELLM_MODEL]
