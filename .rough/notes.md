@@ -156,8 +156,6 @@ Based on existing MCP PDF RAG server implementations (pdf-mcp, rag-mcp-server, p
 
 | Package | Purpose |
 |---------|---------|
-| **pytest** | Testing |
-| **pytest-asyncio** | Async tests |
 | **black** | Code formatting |
 | **ruff** | Linting (fast, Rust-based) |
 | **mypy** | Type checking |

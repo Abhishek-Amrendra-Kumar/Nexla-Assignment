@@ -36,7 +36,7 @@ uv remove <pkg>                           # uninstall + update lock
 
 # Running code
 uv run python script.py                    # run in managed env
-uv run pytest                              # run tests
+uv run python tests/test_indexer.py        # run tests
 uv run -- python script.py --arg value    # explicit separator if args conflict
 
 # Inspection
@@ -162,7 +162,7 @@ uv add <pkg>
 uv run python -m nexla_mcp.server
 
 # Run tests
-uv run pytest
+uv run python tests/test_indexer.py
 ```
 
 ### File Edit Guidelines

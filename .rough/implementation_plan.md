@@ -22,7 +22,7 @@ touch src/nexla_mcp/__init__.py
 ### 0.3 Configure pyproject.toml
 Edit `pyproject.toml`:
 - Add `[project] name = "nexla-mcp"`, version, description, license, requires-python >=3.10
-- Add `[project.optional-dependencies]` with `dev` group: pytest, pytest-asyncio, black, ruff
+- Add `[project.optional-dependencies]` with `dev` group: black, ruff
 - Add `[project.scripts]` to expose CLI (optional)
 
 ### 0.4 Create .gitignore
@@ -33,7 +33,6 @@ venv/
 .venv/
 .env
 uv.lock
-.pytest_cache/
 .rough/
 *.egg-info/
 dist/
@@ -67,7 +66,7 @@ uv add langchain-ollama
 uv add tqdm
 
 # Dev dependencies
-uv add --dev pytest pytest-asyncio black ruff
+uv add --dev black ruff
 ```
 
 **Note:** `sentence-transformers` is NOT used — it requires PyTorch which causes installation issues. Use `fastembed` instead (Flag Embedding model, BAAI/bge-small-en-v1.5, 384-dim).
@@ -656,7 +655,6 @@ Directory: `tests/`
 ### 8.1 Test extraction
 File: `tests/test_pdf_processor.py`
 ```python
-import pytest
 from pathlib import Path
 from nexla_mcp.pdf_processor import extract_text_from_pdf, chunk_pages
 
@@ -676,7 +674,6 @@ def test_chunk_pages():
 ### 8.2 Test retrieval
 File: `tests/test_retriever.py`
 ```python
-import pytest
 from nexla_mcp.retriever import retrieve, build_context
 
 def test_retrieve_returns_chunks():
@@ -694,7 +691,6 @@ def test_build_context():
 ### 8.3 Test indexer
 File: `tests/test_indexer.py`
 ```python
-import pytest
 from pathlib import Path
 from nexla_mcp.indexer import get_model, encode_texts, get_chroma_client
 
@@ -742,7 +738,6 @@ def test_chroma_client_persists(tmp_path):
 ### 8.4 Test LLM
 File: `tests/test_llm.py`
 ```python
-import pytest
 from nexla_mcp.llm import generate_answer_with_sources
 
 def test_generate_answer_with_empty_chunks():
@@ -805,7 +800,7 @@ def test_generate_answer_with_irrelevant_question():
 
 ### 8.6 Run all tests
 ```bash
-uv run pytest tests/ -v
+uv run python tests/test_indexer.py
 ```
 
 ### 8.7 Random QA verification script (CORRECTED)

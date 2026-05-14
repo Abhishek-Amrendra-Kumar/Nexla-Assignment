@@ -57,7 +57,7 @@ All tools are exposed via the MCP protocol (`fastmcp`):
 
 ```bash
 uv sync                       # sync environment
-uv run pytest tests/ -v       # run tests
+uv run python tests/test_indexer.py   # run indexer tests
 uv run ruff check . && uv run ruff format .  # lint & format
 ```
 

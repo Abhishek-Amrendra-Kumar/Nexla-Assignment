@@ -46,8 +46,6 @@
 Dev dependencies:
 | Package | Purpose |
 |---------|---------|
-| `pytest` | Testing |
-| `pytest-asyncio` | Async tests |
 | `black` | Formatting |
 | `ruff` | Linting |
 
@@ -171,7 +169,7 @@ Dev dependencies:
   - `test_pdf_processor.py` — extraction tests (mock PDF or use real small PDF)
   - `test_retriever.py` — retrieval tests
   - `test_server.py` — integration tests with FastMCP client
-- [ ] Run `uv run pytest` — all tests pass
+- [ ] Run `uv run python tests/test_indexer.py` — test passes
 - [ ] Manual test: ask 3 questions from the qa.jsonl files (use real questions from the data)
   - Verify answers are grounded in document content
   - Verify source attribution is present
@@ -218,7 +216,7 @@ Dev dependencies:
 **Goal:** Prepare public GitHub repo for submission.
 
 - [ ] Initialize git repo (if not already)
-- [ ] Create `.gitignore` (venv, .env, __pycache__, uv.lock, .pytest_cache)
+- [ ] Create `.gitignore` (venv, .env, __pycache__, uv.lock)
 - [ ] Ensure `pyproject.toml` is complete with all metadata
 - [ ] Remove `.rough/` from repo (or add to .gitignore)
 - [ ] Create initial commit
