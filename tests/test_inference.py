@@ -21,7 +21,7 @@ import sacrebleu
 from rouge_score import rouge_scorer
 from sentence_transformers import SentenceTransformer
 
-from nexla_mcp.server import query_documents
+from nexla_mcp.mcp import query_documents
 from nexla_mcp.indexer import encode_texts
 
 

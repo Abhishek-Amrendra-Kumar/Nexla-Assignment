@@ -19,7 +19,7 @@ mcp = FastMCP("Nexla PDF Q&A Server")
 
 
 @mcp.tool
-def query_documents(question: str, top_k: int = 5) -> dict:
+def query_documents(question: str, top_k: int = 10) -> dict:
     """
     Ask a question about the PDF documents and receive a grounded answer.
 
