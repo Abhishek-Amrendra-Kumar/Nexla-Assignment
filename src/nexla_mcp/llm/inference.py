@@ -1,7 +1,7 @@
 from openai import OpenAI
 import time
 from nexla_mcp.llm.prompts import SYSTEM_PROMPT
-from nexla_mcp.secrets import Secrets
+from nexla_mcp.env_secrets import Secrets
 
 
 class LLM:

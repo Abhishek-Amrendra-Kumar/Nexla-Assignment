@@ -2,7 +2,7 @@ from huggingface_hub import InferenceClient
 import chromadb
 from chromadb.config import Settings
 from pathlib import Path
-from nexla_mcp.secrets import Secrets
+from nexla_mcp.env_secrets import Secrets
 
 MODEL_NAME = "sentence-transformers/all-mpnet-base-v2"
 PERSIST_DIR = Path("chroma_db")
