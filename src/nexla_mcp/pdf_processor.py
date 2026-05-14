@@ -84,26 +84,33 @@ def chunk_pages(
     return all_chunks
 
 
+def extract_document(pdf_path: Path) -> list[PageChunk]:
+    """Extract and chunk a single PDF. Returns all chunks."""
+    doc_id = pdf_path.parent.name
+    pages = extract_text_from_pdf(pdf_path)
+    chunks = []
+    for page_idx, page_text in enumerate(pages):
+        page_chunks = chunk_pages([page_text])
+        for chunk_idx, chunk in enumerate(page_chunks):
+            chunks.append(
+                PageChunk(
+                    doc_id=doc_id,
+                    doc_filename=pdf_path.name,
+                    page_number=page_idx + 1,  # 1-indexed page number
+                    chunk_index=chunk_idx,  # per-page chunk index (avoids ID collisions)
+                    text=chunk,
+                    token_count=int(len(chunk.split()) * 1.3),
+                )
+            )
+    return chunks
+
+
 def extract_all_documents(data_dir: Path = Path("data")) -> list[PageChunk]:
     """Extract and chunk all PDFs. Returns all chunks."""
-    chunks = []
-    for pdf_path in sorted(data_dir.glob("*/[0-9]*.pdf")):
-        doc_id = pdf_path.parent.name
-        pages = extract_text_from_pdf(pdf_path)
-        for page_idx, page_text in enumerate(pages):
-            page_chunks = chunk_pages([page_text])
-            for chunk_idx, chunk in enumerate(page_chunks):
-                chunks.append(
-                    PageChunk(
-                        doc_id=doc_id,
-                        doc_filename=pdf_path.name,
-                        page_number=page_idx + 1,  # 1-indexed page number
-                        chunk_index=chunk_idx,  # per-page chunk index (avoids ID collisions)
-                        text=chunk,
-                        token_count=int(len(chunk.split()) * 1.3),
-                    )
-                )
-    return chunks
+    all_chunks = []
+    for pdf_path in sorted(data_dir.glob("*/*.pdf")):
+        all_chunks.extend(extract_document(pdf_path))
+    return all_chunks
 
 
 if __name__ == "__main__":
