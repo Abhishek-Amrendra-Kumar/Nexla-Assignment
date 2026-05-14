@@ -5,7 +5,8 @@ MODEL_NAME = "lightonai/DenseOn"
 USE_LOCAL_INFERENCE = True
 
 # Indexing limits
-DOC_LIMIT = 2
+DOC_LIMIT = 10000000000
+INDEX_BATCH_SIZE = 100
 
 # ChromaDB persistence
 PERSIST_DIR = Path("chroma_db")

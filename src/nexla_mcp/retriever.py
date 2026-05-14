@@ -1,4 +1,4 @@
-from nexla_mcp.indexer import encode_texts, get_or_create_index
+from nexla_mcp.indexer import encode_texts, get_index
 
 
 def retrieve(question: str, top_k: int = 5) -> list[dict]:
@@ -13,7 +13,7 @@ def retrieve(question: str, top_k: int = 5) -> list[dict]:
         "score": float
     }
     """
-    collection = get_or_create_index()
+    collection = get_index()
 
     # Embed question using fastembed via encode_texts
     question_embedding = encode_texts([question], prompt_name="query")[0]

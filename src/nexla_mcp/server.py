@@ -9,9 +9,9 @@ _collection = None
 def get_collection():
     global _collection
     if _collection is None:
-        from nexla_mcp.indexer import get_or_create_index
+        from nexla_mcp.indexer import get_index
 
-        _collection = get_or_create_index()
+        _collection = get_index()
     return _collection
 
 
