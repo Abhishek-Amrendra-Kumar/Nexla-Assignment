@@ -9,7 +9,7 @@ __pycache__/
 dist/
 build/
 *.egg
-
+uv.lock
 # uv lock file (commit this!)
 # uv.lock
 
@@ -36,8 +36,9 @@ htmlcov/
 *.cover
 .hypothesis/
 
-# Data (commit data/ but not generated indexes)
-data/
+# Data (PDFs and QA files are tracked; only generated indexes are ignored)
+data/chroma_db/
+data
 template.zip
 
 # Scratch / research notes
@@ -56,3 +57,6 @@ Thumbs.db
 
 # MCP server runtime
 .mcp/
+
+# CUSTOM
+todos.md

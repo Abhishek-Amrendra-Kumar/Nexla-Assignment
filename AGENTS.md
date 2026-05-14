@@ -172,4 +172,17 @@ uv run pytest
 
 ---
 
+## 6. Code Quality with Ruff
+
+**ALL Python code must be formatted and linted with `ruff`.**
+
+Ruff is the project's primary linter and formatter. Use it for:
+- Formatting: `uv run ruff format <files>`
+- Linting: `uv run ruff check <files> --fix`
+- Both: `uv run ruff check <files> --fix && uv run ruff format <files>`
+
+Always run ruff before committing or submitting changes.
+
+---
+
 *Last updated: 2026-05-14*

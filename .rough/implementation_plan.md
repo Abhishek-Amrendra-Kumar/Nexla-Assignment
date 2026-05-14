@@ -57,8 +57,8 @@ uv add fastmcp
 uv add pymupdf
 uv add pymupdf4llm
 uv add chromadb
-uv add sentence-transformers
-uv add faiss-cpu
+uv add fastembed              # Embeddings — ONNX-based, no PyTorch dependency
+uv add "numpy<2"              # Required: NumPy 1.x for onnxruntime compatibility
 uv add pydantic
 uv add httpx
 uv add tomli
@@ -70,11 +70,13 @@ uv add tqdm
 uv add --dev pytest pytest-asyncio black ruff
 ```
 
+**Note:** `sentence-transformers` is NOT used — it requires PyTorch which causes installation issues. Use `fastembed` instead (Flag Embedding model, BAAI/bge-small-en-v1.5, 384-dim).
+
 **Verify:**
 ```bash
-uv pip freeze | grep -E "fastmcp|pymupdf|chromadb|sentence|faiss|pydantic|langchain"
+uv pip freeze | grep -E "fastmcp|pymupdf|chromadb|fastembed|faiss|pydantic|langchain"
 ```
-**Exit:** All packages present. `uv run python -c "import fastmcp, fitz, chromadb"` succeeds.
+**Exit:** All packages present. `uv run python -c "import fastmcp, fitz, chromadb; from fastembed.embedding import FlagEmbedding; print('all ok')"` succeeds.
 
 ---
 
@@ -94,10 +96,69 @@ EOF
 ### 2.2 Build document inventory
 Write to `src/nexla_mcp/inventory.py`:
 ```python
-def build_inventory() -> list[dict]:
-    """Returns list of {id, pdf_filename, qa_filename, pdf_exists, qa_type}."""
-    # ... glob data/*/*.pdf and data/*/*_qa.jsonl
-    # For each qa.jsonl, read first line to detect type distribution
+import json
+import fitz
+from pathlib import Path
+from typing import Optional
+
+def build_inventory(data_dir: Path = Path("data")) -> list[dict]:
+    """
+    Scans data/ and returns a list of dicts, one per document:
+    {
+        "id": str,
+        "pdf_filename": str,
+        "qa_filename": Optional[str],
+        "pdf_exists": bool,
+        "page_count": int,
+        "qa_types": list[str]  # e.g. ["text-only", "multimodal-t"]
+    }
+    """
+    inventory = []
+    for doc_dir in sorted(data_dir.iterdir()):
+        if not doc_dir.is_dir():
+            continue
+        doc_id = doc_dir.name
+
+        # Find PDF
+        pdfs = list(doc_dir.glob("*.pdf"))
+        pdf_path = pdfs[0] if pdfs else None
+
+        # Find qa.jsonl
+        qa_files = list(doc_dir.glob("*_qa.jsonl"))
+        qa_path = qa_files[0] if qa_files else None
+
+        # Count PDF pages
+        page_count = 0
+        if pdf_path:
+            try:
+                doc = fitz.open(str(pdf_path))
+                page_count = len(doc)
+                doc.close()
+            except Exception:
+                page_count = 0
+
+        # Read qa types
+        qa_types = []
+        if qa_path:
+            try:
+                with open(qa_path) as f:
+                    for line in f:
+                        entry = json.loads(line)
+                        if "type" in entry:
+                            qa_types.append(entry["type"])
+            except Exception:
+                pass
+
+        inventory.append({
+            "id": doc_id,
+            "pdf_filename": pdf_path.name if pdf_path else "",
+            "qa_filename": qa_path.name if qa_path else None,
+            "pdf_exists": pdf_path is not None,
+            "page_count": page_count,
+            "qa_types": list(set(qa_types))
+        })
+
+    return inventory
 ```
 
 ### 2.3 Output inventory
@@ -140,7 +201,9 @@ def extract_text_from_pdf(pdf_path: Path) -> list[str]:
         page = doc[page_num]
         # Try markdown first (better for AI), fall back to plain text
         try:
-            text = pymupdf4llm.to_markdown(doc, pages=[page_num])
+            # CORRECTED: pass pdf_path (str), not fitz.Document; pages is 0-indexed page list
+            md = pymupdf4llm.to_markdown(str(pdf_path), pages=[page_num])
+            text = md  # to_markdown returns a single concatenated string for specified pages
         except Exception:
             text = page.get_text("text")
         pages.append(text)
@@ -148,10 +211,57 @@ def extract_text_from_pdf(pdf_path: Path) -> list[str]:
     return pages
 
 def chunk_pages(pages: list[str], chunk_size: int = 500, overlap: int = 50) -> list[str]:
-    """Split pages into chunks of ~chunk_size tokens with overlap."""
-    # Use naive splitting by sentence boundaries
-    # For each chunk, count tokens approx as len(words) * 1.3
-    ...
+    """
+    Split a list of page texts into chunks of ~chunk_size tokens with overlap.
+
+    Tokens are estimated as len(words) * 1.3.
+    Chunks are split at sentence boundaries (period + space) where possible.
+
+    Returns list of chunk strings.
+    """
+    import re
+
+    def split_into_sentences(text: str) -> list[str]:
+        """Split text on sentence boundaries (., !, ?) while preserving the delimiter."""
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        return [s.strip() for s in sentences if s.strip()]
+
+    def estimate_tokens(text: str) -> int:
+        return int(len(text.split()) * 1.3)
+
+    all_chunks = []
+
+    for page_text in pages:
+        sentences = split_into_sentences(page_text)
+        current_chunk = ""
+        current_tokens = 0
+
+        for sentence in sentences:
+            sentence_tokens = estimate_tokens(sentence)
+
+            if current_tokens + sentence_tokens <= chunk_size:
+                current_chunk += (" " + sentence).strip()
+                current_tokens += sentence_tokens
+            else:
+                # Emit current chunk if non-empty
+                if current_chunk:
+                    all_chunks.append(current_chunk)
+                # Start new chunk with overlap
+                if overlap > 0 and current_chunk:
+                    # Backtrack: include last ~overlap tokens into next chunk
+                    words = current_chunk.split()
+                    overlap_words = " ".join(words[-int(overlap / 1.3):])
+                    current_chunk = (overlap_words + " " + sentence).strip()
+                    current_tokens = estimate_tokens(current_chunk)
+                else:
+                    current_chunk = sentence
+                    current_tokens = sentence_tokens
+
+        # Don't forget the last chunk
+        if current_chunk:
+            all_chunks.append(current_chunk)
+
+    return all_chunks
 ```
 
 ### 3.3 Implement extraction pipeline
@@ -195,45 +305,54 @@ uv run python -c "from nexla_mcp.pdf_processor import extract_all_documents; pri
 
 File: `src/nexla_mcp/indexer.py`
 
+**Library choice:** `fastembed` — ONNX-based, no PyTorch, works natively with ChromaDB.
+
 ### 4.1 Imports and setup
 ```python
+from fastembed.embedding import FlagEmbedding
 import chromadb
 from chromadb.config import Settings
-from sentence_transformers import SentenceTransformer
 from pathlib import Path
 
-MODEL_NAME = "all-MiniLM-L6-v2"
+MODEL_NAME = "BAAI/bge-small-en-v1.5"  # 384-dim, top of MTEB leaderboard
 PERSIST_DIR = Path("data/chroma_db")
 
 # Initialize model once (lazy load on first call)
 _model = None
 
-def get_model():
+def get_model() -> FlagEmbedding:
     global _model
     if _model is None:
-        _model = SentenceTransformer(MODEL_NAME)
+        _model = FlagEmbedding(model_name=MODEL_NAME)
     return _model
 ```
 
 ### 4.2 ChromaDB client
 ```python
 def get_chroma_client(persist_dir: Path = PERSIST_DIR):
-    return chromadb.Client(Settings(
-        persist_directory=str(persist_dir),
-        anonymized_telemetry=False
-    ))
+    return chromadb.PersistentClient(
+        path=str(persist_dir),
+        settings=Settings(anonymized_telemetry=False)
+    )
 ```
 
-### 4.3 Index all chunks
+### 4.3 Encode texts helper
+```python
+def encode_texts(texts: list[str]) -> list[list[float]]:
+    """Encode texts into fastembed embeddings."""
+    model = get_model()
+    return list(model.embed(texts))
+```
+
+### 4.4 Index all chunks
 ```python
 def index_documents(chunks: list, collection_name: str = "nexla_docs"):
     """Embed chunks and store in ChromaDB."""
     client = get_chroma_client()
     collection = client.get_or_create_collection(name=collection_name)
 
-    model = get_model()
     texts = [c.text for c in chunks]
-    embeddings = model.encode(texts).tolist()
+    embeddings = encode_texts(texts)
 
     # Prepare metadata
     metadatas = [
@@ -250,11 +369,10 @@ def index_documents(chunks: list, collection_name: str = "nexla_docs"):
     ids = [f"{c.doc_id}_{c.page_number}_{c.chunk_index}" for c in chunks]
 
     collection.add(ids=ids, embeddings=embeddings, documents=texts, metadatas=metadatas)
-    client.persist()
     return len(chunks)
 ```
 
-### 4.4 Load existing index or re-index
+### 4.5 Load existing index or re-index
 ```python
 def get_or_create_index(data_dir: Path = Path("data")):
     """On startup: load existing ChromaDB or build from scratch."""
@@ -279,7 +397,7 @@ File: `src/nexla_mcp/retriever.py`
 
 ### 5.1 Imports
 ```python
-from nexla_mcp.indexer import get_model, get_or_create_index
+from nexla_mcp.indexer import encode_texts, get_or_create_index
 ```
 
 ### 5.2 Retrieve function
@@ -296,11 +414,10 @@ def retrieve(question: str, top_k: int = 5) -> list[dict]:
         "score": float
     }
     """
-    model = get_model()
     collection = get_or_create_index()
 
-    # Embed question
-    question_embedding = model.encode([question]).tolist()[0]
+    # Embed question using fastembed
+    question_embedding = encode_texts([question])[0]
 
     # Query ChromaDB
     results = collection.query(
@@ -375,12 +492,15 @@ Rules:
 """
 ```
 
-### 6.3 Generate answer with sources
+### 6.3 Generate answer with sources (CORRECTED)
 ```python
 def generate_answer_with_sources(question: str, chunks: list[dict]) -> tuple[str, list[dict]]:
     """
     Returns (answer: str, sources: list[dict]).
     sources format: [{"doc_filename": str, "page_number": int, "text": str}, ...]
+
+    NOTE: Returns plain dicts (not Source Pydantic model instances) so that
+    server.py can use them directly without needing .model_dump() calls.
     """
     if not chunks:
         return "I don't know based on the provided documents.", []
@@ -393,6 +513,7 @@ def generate_answer_with_sources(question: str, chunks: list[dict]) -> tuple[str
     response = llm.invoke(SYSTEM_PROMPT + f"\n\n{human_prompt}")
     answer = response.content if hasattr(response, 'content') else str(response)
 
+    # Returns plain dicts — server.py uses them directly without .model_dump()
     sources = [
         {
             "doc_filename": c["doc_filename"],
@@ -476,9 +597,11 @@ def query_documents(question: str, top_k: int = 5) -> dict:
     """
     chunks = retrieve(question, top_k=top_k)
     answer, sources = generate_answer_with_sources(question, chunks)
+    # CORRECTED: sources is already list[dict] from generate_answer_with_sources,
+    # not Pydantic model instances — use directly without .model_dump()
     return {
         "answer": answer,
-        "sources": [s.model_dump() for s in sources]
+        "sources": sources
     }
 ```
 
@@ -568,40 +691,216 @@ def test_build_context():
     assert "Hello world" in ctx
 ```
 
-### 8.3 Test server (integration)
-File: `tests/test_server.py`
+### 8.3 Test indexer
+File: `tests/test_indexer.py`
 ```python
 import pytest
-from fastmcp import Client
-from nexla_mcp.server import mcp
+from pathlib import Path
+from nexla_mcp.indexer import get_model, encode_texts, get_chroma_client
 
-@pytest.mark.asyncio
-async def test_query_documents():
-    async with Client("src/nexla_mcp/server.py") as client:
-        result = await client.call_tool("query_documents", {"question": "What is this about?", "top_k": 3})
-        # Verify structure
-        data = result.content[0].text
-        assert "answer" in data
+def test_model_loads():
+    """Model loads and encodes without error."""
+    model = get_model()
+    embeddings = list(model.embed(["test sentence"]))
+    embedding = embeddings[0]
+    assert len(embedding) == 384  # BAAI/bge-small-en-v1.5 is 384-dim
+
+def test_encode_texts():
+    """encode_texts returns list of float vectors."""
+    embeddings = encode_texts(["hello world", "fastembed is fast"])
+    assert len(embeddings) == 2
+    assert all(isinstance(e, list) for e in embeddings)
+    assert all(isinstance(x, float) for e in embeddings for x in e)
+    assert len(embeddings[0]) == 384
+
+def test_chroma_client_persists(tmp_path):
+    """ChromaDB can add and retrieve a chunk."""
+    from fastembed.embedding import FlagEmbedding
+
+    client = chromadb.PersistentClient(path=str(tmp_path))
+    collection = client.get_or_create_collection(name="test_collection")
+
+    model = FlagEmbedding(model_name="BAAI/bge-small-en-v1.5")
+    embedding = list(model.embed(["hello world"]))[0]
+
+    collection.add(
+        ids=["chunk_1"],
+        embeddings=[embedding],
+        documents=["hello world"],
+        metadatas=[{"doc_id": "test", "doc_filename": "test.pdf", "page_number": 1, "chunk_index": 0, "token_count": 2}]
+    )
+
+    results = collection.query(
+        query_embeddings=[embedding],
+        n_results=1,
+        include=["documents", "metadatas"]
+    )
+    assert results["documents"][0][0] == "hello world"
+    assert results["metadatas"][0][0]["doc_filename"] == "test.pdf"
 ```
 
-### 8.4 Run tests
+### 8.4 Test LLM
+File: `tests/test_llm.py`
+```python
+import pytest
+from nexla_mcp.llm import generate_answer_with_sources
+
+def test_generate_answer_with_empty_chunks():
+    """No chunks should return 'I don't know'."""
+    answer, sources = generate_answer_with_sources("What is AI?", [])
+    assert "don't know" in answer.lower() or "cannot answer" in answer.lower()
+    assert sources == []
+
+def test_generate_answer_with_chunks():
+    """With valid chunks, should return an answer and sources."""
+    chunks = [
+        {
+            "text": "Artificial intelligence is the simulation of human intelligence by machines.",
+            "doc_filename": "test.pdf",
+            "page_number": 1,
+            "chunk_index": 0
+        }
+    ]
+    answer, sources = generate_answer_with_sources("What is AI?", chunks)
+    assert isinstance(answer, str)
+    assert len(answer) > 0
+    assert len(sources) == 1
+    assert sources[0]["doc_filename"] == "test.pdf"
+    assert sources[0]["page_number"] == 1
+
+def test_generate_answer_with_irrelevant_question():
+    """
+    Chunks are about AI, question is completely unrelated (cooking).
+    LLM should refuse to answer from context and return a 'don't know' variant.
+    """
+    chunks = [
+        {
+            "text": "Artificial intelligence is the simulation of human intelligence by machines.",
+            "doc_filename": "test.pdf",
+            "page_number": 1,
+            "chunk_index": 0
+        }
+    ]
+    answer, sources = generate_answer_with_sources(
+        "What is the best recipe for chocolate chip cookies?",
+        chunks
+    )
+    answer_lower = answer.lower()
+    # LLM should indicate it cannot answer from the provided context
+    assert any(
+        phrase in answer_lower
+        for phrase in [
+            "don't know",
+            "cannot answer",
+            "not contain",
+            "not provided",
+            "not in the context",
+            "based on the documents",
+            "don't have",
+        ]
+    ), f"Expected 'don't know' variant for irrelevant question, got: {answer}"
+    # Sources may still be returned but answer should be a refusal
+    assert isinstance(sources, list)
+```
+
+### 8.6 Run all tests
 ```bash
 uv run pytest tests/ -v
 ```
 
-### 8.5 Manual QA verification
-Run 3 questions from `data/*/*_qa.jsonl` against the live server:
+### 8.7 Random QA verification script (CORRECTED)
+Run `scripts/random_qa_sample.py` to randomly sample questions from `*_qa.jsonl` files and print retrieved context vs expected answer for manual review.
+
+File: `scripts/random_qa_sample.py`
 ```python
-# questions from qa.jsonl files:
-questions = [
-    "What is the primary challenge addressed by the introduction of the Linked WikiText-2 dataset?",
-    "What is the top-1 accuracy of the Oracle KGLM on birthdate prediction?",
-    "How many documents are in the training set of the Linked WikiText-2 Corpus?"
-]
-# For each, verify: answer is grounded, sources present, doc + page cited
+#!/usr/bin/env python3
+"""
+Randomly sample questions from *_qa.jsonl files and compare
+retrieved context against the expected answer for manual verification.
+
+Usage:
+    python scripts/random_qa_sample.py --count 5
+
+NOTE: This script calls the retriever directly (not via FastMCP Client),
+since FastMCP Client connects to a running server URL, not a local file path.
+To test the full LLM pipeline, start the server separately and use an MCP client.
+"""
+import argparse
+import json
+import random
+from pathlib import Path
+
+def find_qa_files(data_dir: Path = Path("data")) -> list[Path]:
+    return list(data_dir.glob("*/*_qa.jsonl"))
+
+def load_qa_entries(qa_files: list[Path]):
+    entries = []
+    for qa_file in qa_files:
+        try:
+            with open(qa_file) as f:
+                for line in f:
+                    entry = json.loads(line)
+                    entry["_qa_file"] = qa_file.name
+                    entry["_doc_id"] = qa_file.parent.name
+                    entries.append(entry)
+        except Exception as e:
+            print(f"Error reading {qa_file}: {e}")
+    return entries
+
+def run_retriever_query(question: str) -> dict:
+    """Call the retriever directly (bypasses LLM for quick context verification)."""
+    from nexla_mcp.retriever import retrieve, build_context
+    chunks = retrieve(question, top_k=3)
+    context = build_context(chunks)
+    sources = [
+        {"doc_filename": c["doc_filename"], "page_number": c["page_number"]}
+        for c in chunks
+    ]
+    return {"context": context, "sources": sources}
+
+def main():
+    parser = argparse.ArgumentParser(description="Random QA sampler")
+    parser.add_argument("--count", type=int, default=5, help="Number of questions to sample")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
+    args = parser.parse_args()
+
+    qa_files = find_qa_files()
+    entries = load_qa_entries(qa_files)
+
+    print(f"\nFound {len(entries)} QA entries across {len(qa_files)} files.")
+    print(f"Sampling {args.count} random questions...\n")
+    print("=" * 80)
+
+    sampled = random.sample(entries, min(args.count, len(entries)))
+
+    for i, entry in enumerate(sampled, 1):
+        print(f"\n--- Sample {i}/{len(sampled)} ---")
+        print(f"Document: {entry['_doc_id']} / {entry['_qa_file']}")
+        print(f"Type:     {entry.get('type', 'unknown')}")
+        print(f"Question: {entry['question']}")
+        print(f"Expected Answer: {entry['answer']}")
+
+        # Run retriever (no LLM call — quick context check)
+        try:
+            result = run_retriever_query(entry["question"])
+            print(f"\nRetrieved Context:\n{result.get('context', 'N/A')[:500]}...")
+            sources = result.get("sources", [])
+            if sources:
+                print("Sources retrieved:")
+                for j, src in enumerate(sources, 1):
+                    print(f"  [{j}] {src.get('doc_filename', '?')} (page {src.get('page_number', '?')})")
+            else:
+                print("Sources: (none)")
+        except Exception as e:
+            print(f"\nRetriever Error: {e}")
+
+        print("-" * 80)
+
+if __name__ == "__main__":
+    main()
 ```
 
-**Exit:** All tests pass. 3 manual Q&A interactions succeed with source attribution.
+**Exit:** Script runs, prints sampled questions with retrieved context + expected answer for manual verification.
 
 ---
 
@@ -627,7 +926,7 @@ Document the pipeline:
 ```
 PDF → PyMuPDF + pymupdf4llm → Text/Markdown
   → Chunking (500 tokens, 50 overlap)
-  → sentence-transformers (all-MiniLM-L6-v2) → Embeddings
+  → fastembed (BAAI/bge-small-en-v1.5, 384-dim) → Embeddings
   → ChromaDB (vector store, persisted)
   → Query: ChromaDB retrieval → LLM (Ollama/GPT) → Answer + Sources
   → FastMCP (MCP tool: query_documents)
@@ -662,24 +961,12 @@ Include 3 Q&A pairs from the actual qa.jsonl files with question, answer, source
 
 ---
 
-## Step 10: GitHub Repository
+## Step 10: Final Verification
+
+> Note: GitHub repo already set up by user. Skip Step 10 GitHub setup.
 
 ```bash
-git init
-git add .
-git commit -m "Initial commit: Nexla MCP PDF Q&A server"
-git branch -M main
-git remote add origin https://github.com/<username>/nexla-mcp.git
-git push -u origin main
-# Verify repo is public
-```
-
----
-
-## Step 11: Final Verification
-
-```bash
-# Fresh clone test
+# Fresh clone test (run in a temp directory)
 cd /tmp && rm -rf nexla-mcp-test && \
   git clone https://github.com/<username>/nexla-mcp.git && \
   cd nexla-mcp && uv sync && uv run python -c "from nexla_mcp import server; print('import ok')"
@@ -702,8 +989,21 @@ Checklist:
 Step 0 → Step 1 → Step 2 → Step 3 → Step 4 ─┐
                               (can overlap)    │
                                               ↓
-                              Step 5 → Step 6 → Step 7 → Step 8 → Step 9 → Step 10 → Step 11
+                              Step 5 → Step 6 → Step 7 → Step 8 → Step 9 → Step 10
 ```
+
+---
+
+## Corrections Applied (2026-05-14)
+
+| Location | Original (broken) | Correction |
+|----------|-------------------|------------|
+| Step 3.2 `pdf_processor.py` | `pymupdf4llm.to_markdown(doc, pages=[page_num])` — passed fitz.Document | `pymupdf4llm.to_markdown(str(pdf_path), pages=[page_num])` — pass file path str |
+| Step 4.2 `indexer.py` | `chromadb.Client(Settings(persist_directory=...))` — wrong API | `chromadb.PersistentClient(path=..., settings=Settings(...))` |
+| Step 6.3 `llm.py` | Returns dicts; server.py called `.model_dump()` on dicts | Returns `list[dict]` explicitly; server.py uses directly |
+| Step 7.2 `server.py` | `"sources": [s.model_dump() for s in sources]` — fails (s is dict) | `"sources": sources` — use dicts directly |
+| Step 8.3 `test_indexer.py` | `chromadb.Client(Settings(persist_directory=...))` | `chromadb.PersistentClient(path=...)` |
+| Step 8.7 `random_qa_sample.py` | `Client("src/nexla_mcp/server.py")` — wrong FastMCP API | Direct import of `retrieve()` + `build_context()` functions |
 
 ---
 

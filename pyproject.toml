@@ -1,0 +1,32 @@
+[project]
+name = "nexla-mcp"
+version = "0.1.0"
+description = "MCP server for PDF Q&A"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "fire-n-ice-737", email = "abhishek.amrendra.kumar@gmail.com" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "chromadb>=1.5.9",
+    "fastmcp>=3.2.4",
+    "huggingface_hub>=0.20.0",
+    "openai>=1.0.0",
+    "pydantic>=2.13.4",
+    "pymupdf>=1.27.2.3",
+    "python-dotenv>=1.2.2",
+]
+
+[project.scripts]
+nexla-mcp = "nexla_mcp:main"
+
+[build-system]
+requires = ["uv_build>=0.11.14,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "black>=26.3.1",
+    "ruff>=0.15.12",
+]
