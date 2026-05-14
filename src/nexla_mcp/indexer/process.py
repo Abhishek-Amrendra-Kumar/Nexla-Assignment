@@ -1,40 +1,13 @@
-import hashlib
-import json
 from datetime import datetime, timezone
-from huggingface_hub import InferenceClient
-import chromadb
-from chromadb.config import Settings
 from pathlib import Path
-from nexla_mcp.env_secrets import Secrets
 
-MODEL_NAME = "sentence-transformers/all-mpnet-base-v2"
-PERSIST_DIR = Path("chroma_db")
-MANIFEST_PATH = PERSIST_DIR / "index_manifest.json"
-
-_client = None
-
-
-def _get_client() -> InferenceClient:
-    global _client
-    if _client is None:
-        token = Secrets().get_hf_token()
-        _client = InferenceClient(model=MODEL_NAME, token=token)
-    return _client
-
-
-def get_chroma_client(persist_dir: Path = PERSIST_DIR):
-    return chromadb.PersistentClient(
-        path=str(persist_dir), settings=Settings(anonymized_telemetry=False)
-    )
-
-
-def encode_texts(texts: list[str]) -> list[list[float]]:
-    client = _get_client()
-    res = []
-    for i, t in enumerate(texts):
-        res.append(client.feature_extraction(t))
-        print(f"{i + 1}/{len(texts)}")
-    return res
+from nexla_mcp.indexer.hf import encode_texts
+from nexla_mcp.indexer.manifest import (
+    _compute_file_hash,
+    _load_manifest,
+    _save_manifest,
+    get_chroma_client,
+)
 
 
 def index_documents(chunks: list, collection_name: str = "nexla_docs"):
@@ -62,33 +35,6 @@ def index_documents(chunks: list, collection_name: str = "nexla_docs"):
     collection.add(ids=ids, embeddings=embeddings, documents=texts, metadatas=metadatas)
     # NOTE: PersistentClient auto-persists; no explicit client.persist() needed
     return len(chunks)
-
-
-def _compute_file_hash(path: Path) -> str:
-    """Compute SHA-256 hash of a file, streaming in 64KB chunks."""
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        while True:
-            chunk = f.read(65536)
-            if not chunk:
-                break
-            h.update(chunk)
-    return h.hexdigest()
-
-
-def _load_manifest() -> dict:
-    """Load the index manifest as {doc_id: {content_hash, indexed_at, chunk_count}}."""
-    if not MANIFEST_PATH.exists():
-        return {}
-    with open(MANIFEST_PATH) as f:
-        return json.load(f)
-
-
-def _save_manifest(manifest: dict):
-    """Save the index manifest to disk."""
-    MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(MANIFEST_PATH, "w") as f:
-        json.dump(manifest, f, indent=2)
 
 
 def _delete_document_chunks(doc_id: str, collection_name: str = "nexla_docs"):
